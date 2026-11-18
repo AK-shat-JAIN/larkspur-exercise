@@ -65,7 +65,6 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ✏�
         thinking={"type": "adaptive"}, tools=tools, messages=messages,
     )
 
-    answer = ""
     turns = 1
     while response.stop_reason == "tool_use" and turns < MAX_TOOL_CALLS:
         messages.append({"role": "assistant", "content": response.content})
@@ -76,8 +75,12 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ✏�
         )
         turns += 1
 
+<<<<<<< HEAD
     answer = text_of(response)
     return answer
+=======
+    return text_of(response)
+>>>>>>> 5b0b3f63417c09b6f3b5a1bcd3b496ec461394a2
 
 
 def tool_list() -> List[Dict[str, Any]]:                   # ✏️ Build 2, step 2.2
@@ -119,7 +122,12 @@ def build_tools() -> List[Dict[str, Any]]:                 # ✏️ Build 1, ste
                 "type": "object",
                 "properties": {
                     "flight_no": {"type": "string"},
+<<<<<<< HEAD
                     "date": {"type": "string", "description": "YYYY-MM-DD"},
+=======
+                    "date": {"type": "string",
+                             "description": "Local departure date of the flight, formatted YYYY-MM-DD (e.g. 2025-05-08). Take it from the booking's segment."},
+>>>>>>> 5b0b3f63417c09b6f3b5a1bcd3b496ec461394a2
                 },
                 "required": ["flight_no", "date"],
             },
@@ -127,6 +135,7 @@ def build_tools() -> List[Dict[str, Any]]:                 # ✏️ Build 1, ste
         {
             "name": "search_alternatives",
             "description": (
+<<<<<<< HEAD
                 "Find replacement Larkspur flights for a booking whose flight is cancelled, "
                 "diverted, or heavily delayed. Call it after lookup_booking has confirmed the "
                 "booking and get_flight_status has confirmed the disruption. Takes only the PNR: "
@@ -140,6 +149,18 @@ def build_tools() -> List[Dict[str, Any]]:                 # ✏️ Build 1, ste
             "input_schema": {
                 "type": "object",
                 "properties": {"pnr": {"type": "string", "description": "The booking's confirmation code, as used in lookup_booking."}},
+=======
+                "Find rebooking options for the passenger's disrupted segment: other Larkspur "
+                "flights on the same route and cabin, ranked, each with an option_id, flights and "
+                "date. Call it after lookup_booking when the customer needs another flight, "
+                "or before check_policy if you need to know how long the wait for an "
+                "alternative is. It only reads and books nothing; pass the option_id you choose "
+                "to hold_seat."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {"pnr": {"type": "string", "description": "Confirmation code from the customer's booking."}},
+>>>>>>> 5b0b3f63417c09b6f3b5a1bcd3b496ec461394a2
                 "required": ["pnr"],
             },
         },
