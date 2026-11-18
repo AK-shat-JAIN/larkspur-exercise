@@ -65,19 +65,17 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ✏�
         thinking={"type": "adaptive"}, tools=tools, messages=messages,
     )
 
-    answer = ""
     turns = 1
     while response.stop_reason == "tool_use" and turns < MAX_TOOL_CALLS:
-        messages.append({"role": "assistant", "content": text_of(response)})
+        messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results(response)})
-        answer = text_of(response)
         response = client.messages.create(
             model=MODEL, max_tokens=4096, system=runtime_preamble() + SYSTEM_PROMPT + TONE_ADDENDUM,
             thinking={"type": "adaptive"}, tools=tools, messages=messages,
         )
         turns += 1
 
-    return answer
+    return text_of(response)
 
 
 def tool_list() -> List[Dict[str, Any]]:                   # ✏️ Build 2, step 2.2
@@ -119,17 +117,25 @@ def build_tools() -> List[Dict[str, Any]]:                 # ✏️ Build 1, ste
                 "type": "object",
                 "properties": {
                     "flight_no": {"type": "string"},
-                    "date": {"type": "string", "description": "MM/DD/YYYY"},
+                    "date": {"type": "string",
+                             "description": "Local departure date of the flight, formatted YYYY-MM-DD (e.g. 2025-05-08). Take it from the booking's segment."},
                 },
                 "required": ["flight_no", "date"],
             },
         },
         {
             "name": "search_alternatives",
-            "description": "search",
+            "description": (
+                "Find rebooking options for the passenger's disrupted segment: other Larkspur "
+                "flights on the same route and cabin, ranked, each with an option_id, flights and "
+                "date. Call it after lookup_booking when the customer needs another flight, "
+                "or before check_policy if you need to know how long the wait for an "
+                "alternative is. It only reads and books nothing; pass the option_id you choose "
+                "to hold_seat."
+            ),
             "input_schema": {
                 "type": "object",
-                "properties": {"pnr": {"type": "string"}},
+                "properties": {"pnr": {"type": "string", "description": "Confirmation code from the customer's booking."}},
                 "required": ["pnr"],
             },
         },
