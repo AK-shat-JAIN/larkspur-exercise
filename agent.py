@@ -13,7 +13,6 @@ from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      new_session, next_available_day, record_tool_result,
                      runtime_preamble)
-import larkspur_mcp_tools as lk   # the ten tool functions behind EXTRA_TOOLS
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
 
@@ -207,7 +206,7 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
         },
     },
 ]
-LOCAL_TOOLS: Dict[str, Any] = dict(lk.TOOLS)   # ✏️ Build 2, step 2.1: the functions behind them
+LOCAL_TOOLS: Dict[str, Any] = {"next_available_day": next_available_day}   # ✏️ Build 2, step 2.1: the functions behind them
 
 
 def text_of(response) -> str:
