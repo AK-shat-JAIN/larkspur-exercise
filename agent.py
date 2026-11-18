@@ -13,12 +13,201 @@ from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      new_session, next_available_day, record_tool_result,
                      runtime_preamble)
+import larkspur_mcp_tools as lk   # the ten tool functions behind EXTRA_TOOLS
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
 
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
-EXTRA_TOOLS: List[Dict[str, Any]] = []   # ✏️ Build 2, step 2.1: schemas for the tools you add
-LOCAL_TOOLS: Dict[str, Any] = {}         # ✏️ Build 2, step 2.1: the functions behind them
+EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
+    {
+        "name": "next_available_day",
+        "description": (
+            "Answer 'when is the first day I can fly?' from the schedule: the earliest date "
+            "with a free seat on a flight that has not left yet, and the free Main (Y) and "
+            "First (J) seats on every flight that day, with scheduled and estimated "
+            "departure. Cancelled, diverted and already-departed flights are left out. Use it "
+            "for questions about WHICH DAY or what is still open; search_alternatives only "
+            "ranks options for one booking's own segment and cannot be pointed at a date or "
+            "a different route. It reads only and holds nothing. Pass origin and dest "
+            "from the booking's disrupted segment to narrow it, or none to see every route."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "origin": {"type": "string", "description": "3-letter origin airport code, e.g. DEN. Optional."},
+                "dest": {"type": "string", "description": "3-letter destination airport code, e.g. BOI. Optional."},
+                "after": {"type": "string", "description": "Start the search on this date, YYYY-MM-DD. Optional; dates in the past are ignored."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "fare_rules",
+        "description": (
+            "Quote the Larkspur Handbook (v14.3, sections 4 to 7: fare families, disruption "
+            "rights, care while you wait, what chat will not do) so a decision can be "
+            "explained in Larkspur's own words. Use it for 'why' questions such as 'why do I "
+            "not get a hotel?'. check_policy decides WHAT is owed for this booking; this "
+            "returns the written rule behind it. With no query it lists the sections."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "A section number (e.g. 6), a title word (e.g. care) or a topic word (e.g. hotel, refund, Basic). Optional."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "reopen_stats",
+        "description": (
+            "Answer 'is this problem going to come back?': how often a kind of problem was "
+            "re-opened within 72 hours in eight conversations handled by people, with the "
+            "reasons. It is a tiny sample, so say 'in our sample' and never promise an "
+            "outcome. Use it when a customer or agent asks whether an issue will recur. "
+            "None of the nine tools has this history."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "description": "The kind of problem: a disruption status (CANCELLED, DELAYED), a cause code (WX, ATC, MX) or an intent label (e.g. refund_vs_credit). Omit for the overall picture."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "care_entitlements",
+        "description": (
+            "Answer 'do I get a meal or a hotel while I wait?': the meal credit, hotel and "
+            "ground transport for this cause, delay, loyalty tier and overnight situation, "
+            "plus Handbook section 6. A hotel is only ever proposed for a person to approve. "
+            "Use it for questions about care while waiting. It does not issue anything and "
+            "does not cover rebooking or refunds; check_policy gives the full ruling with a "
+            "policy_row_id, and issue_voucher is what actually issues a credit."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "enum": ["ON_TIME", "DELAYED", "CANCELLED", "DIVERTED"], "description": "From get_flight_status."},
+                "cause_code": {"type": "string", "enum": ["WX", "ATC", "MX", "CREW", "SEC"], "description": "From get_flight_status, never guessed from what the customer says."},
+                "delay_minutes": {"type": "integer", "description": "Delay in minutes from get_flight_status. Use 0 for CANCELLED or DIVERTED."},
+                "loyalty_tier": {"type": "string", "enum": ["Member", "Silver", "Gold", "Summit"], "description": "From lookup_booking. Member if none."},
+                "overnight": {"type": "boolean", "description": "True if the new flight leaves on a later day and the customer is away from home. Default false."},
+                "wait_minutes": {"type": "integer", "description": "Minutes until the new flight the customer chose, if any. Decides the meal for cancelled or diverted flights."},
+            },
+            "required": ["status", "cause_code"],
+        },
+    },
+    {
+        "name": "cause_in_plain_words",
+        "description": (
+            "Answer 'why was my flight cancelled?' in words the customer can repeat: the "
+            "customer-facing name of the cause (for example 'weather'). Use exactly those "
+            "words and do not elaborate or assign blame. Give a cause_code from "
+            "get_flight_status, or a flight number and date and it will look the cause up."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "cause_code": {"type": "string", "enum": ["WX", "ATC", "MX", "CREW", "SEC"], "description": "Cause from get_flight_status. Optional if flight_no and date are given."},
+                "flight_no": {"type": "string", "description": "Flight number, e.g. LK415. Used with date when cause_code is not given."},
+                "date": {"type": "string", "description": "Local departure date YYYY-MM-DD for flight_no."},
+                "language": {"type": "string", "enum": ["en", "es"], "description": "Customer's language. Default en."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "departures_in_window",
+        "description": (
+            "Answer 'what is still leaving Denver this afternoon?': flights leaving an "
+            "airport on a date between two times, with status, delay and estimated "
+            "departure. Cancelled and diverted flights are counted, not listed. Use it for "
+            "what is leaving an AIRPORT in a time window; get_flight_status is for one named "
+            "flight and search_alternatives is for one booking."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "airport": {"type": "string", "description": "3-letter origin airport code, e.g. DEN."},
+                "date": {"type": "string", "description": "Local date YYYY-MM-DD. Optional; defaults to today."},
+                "from_time": {"type": "string", "description": "Window start, HH:MM local. Optional; defaults to now."},
+                "to_time": {"type": "string", "description": "Window end, HH:MM local. Optional; defaults to 23:59."},
+            },
+            "required": ["airport"],
+        },
+    },
+    {
+        "name": "seats_left",
+        "description": (
+            "Answer 'is there room on that flight for the three of us?': free seats in Main "
+            "(Y) and First (J) on one named flight and date, and whether the whole party "
+            "fits together. Use it before offering a flight to a party. It reads only; "
+            "nothing is held. For which day to fly use next_available_day."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "flight_no": {"type": "string", "description": "Flight number, e.g. LK3411."},
+                "date": {"type": "string", "description": "Local departure date YYYY-MM-DD. Optional; omit to see every date."},
+                "party_size": {"type": "integer", "description": "How many passengers travel together. Default 1."},
+                "cabin": {"type": "string", "enum": ["Y", "J"], "description": "Y = Main, J = First. Optional; both are shown if omitted."},
+            },
+            "required": ["flight_no"],
+        },
+    },
+    {
+        "name": "ground_stop_status",
+        "description": (
+            "Answer 'is Denver still stopped, and until when?': whether an airport has a "
+            "ground stop in effect right now, when it began and is expected to end, and "
+            "which flights are linked to it. The end time is an expectation, not a promise. "
+            "Use it for airport-wide stops; get_flight_status covers one flight's own delay."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "airport": {"type": "string", "description": "3-letter airport code, e.g. DEN."},
+            },
+            "required": ["airport"],
+        },
+    },
+    {
+        "name": "hold_time_left",
+        "description": (
+            "Answer 'how long do I have before this seat is released?': the minutes left on "
+            "a seat hold made with hold_seat (holds last 15 minutes). Use it when the "
+            "customer asks how long they have to decide. It never extends or recreates a "
+            "hold; if it has expired, call search_alternatives and hold_seat again."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hold_id": {"type": "string", "description": "The hold_id returned by hold_seat, e.g. HOLD-1A2B3C."},
+            },
+            "required": ["hold_id"],
+        },
+    },
+    {
+        "name": "what_automation_will_not_do",
+        "description": (
+            "Answer 'can you just cancel the whole trip for me?': Handbook section 7, what "
+            "chat is not allowed to do (refunds, fare differences, hotel approval, other "
+            "airlines, groups of 10 or more, unaccompanied minors, partner flights, pets, "
+            "medical requests, baggage tracing). Pass the customer's request to learn which "
+            "restriction it falls under, then explain it and use escalate_to_human. "
+            "Do not attempt the action yourself."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "request": {"type": "string", "description": "What the customer asked for, in their words. Optional."},
+            },
+            "required": [],
+        },
+    },
+]
+LOCAL_TOOLS: Dict[str, Any] = dict(lk.TOOLS)   # ✏️ Build 2, step 2.1: the functions behind them
 
 
 def text_of(response) -> str:
