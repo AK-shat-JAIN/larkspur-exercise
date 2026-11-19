@@ -8,7 +8,7 @@ Number: About $0.11 per resolved contact (modelled at Sonnet list prices, no cac
 Safety check: The loop stops at 8 tool calls, rebooking and vouchers go through their own policy-checked tools, and group bookings escalate to a human; every step passed its gate (1.2 to 2.2) on the wire, not by reading the code.
 Next: Write the tone instruction in TONE_ADDENDUM for abusive customers, then re-run all five bookings and the eval cases to check nothing else moved.
 Still broken: The abusive-message booking (R8KD3F) gets the same calm, normal resolution as everyone else, with no tone gate and no hand-off to a human.
-Lever: cost
+Lever: intelligence
 
 ## Priya asked
 
