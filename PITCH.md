@@ -12,7 +12,7 @@ Lever: <cost | speed | intelligence>
 
 ## Priya asked
 
-Costs:
-Wrong:
-Runs it:
-Left out:
+Costs: About $0.054 per ticket in model cost, against $6.90 for a person: our five ticket types used 64,259 tokens in and 5,181 out in total (about $0.27 at Sonnet list prices, from bench.py's price table). That is model cost only, not Larkspur's full loaded cost.
+Wrong: We have no eval cases yet, so today we only find out by reading the trace: it shows every tool call and what the tool answered next to what the agent told the customer, and check_policy echoes a policy_row_id to check it against. The customer cannot be booked onto a wrong answer, because the agent only holds a seat and the customer's own click confirms; refunds, hotels over the limit and money questions go to a person.
+Runs it: Not agreed with Larkspur yet. Proposed: Larkspur's Customer Commitment team, which owns the policy table the agent reads, keeps the policy and flight data current; one named engineer on Larkspur's side reads a sample of traces each week and re-runs our eval cases (still to be written) after every change to a tool description or the prompt.
+Left out: Everything in Handbook section 7: refunds, fare-difference payments, hotel approval, other-airline rebooking, groups of 10 or more, unaccompanied minors, partner-operated itineraries, pets and medical requests, and baggage tracing. The agent explains and hands over with a summary, because those involve money, safety or another airline. It also never confirms a rebooking, and we did not build Spanish replies or looking up a second booking code.
