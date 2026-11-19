@@ -20,7 +20,17 @@ from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
 
-TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
+TONE_ADDENDUM = """
+
+Tone and safety rules. These override everything above.
+
+1. Abuse or a legal threat. If the customer is abusive, or mentions a lawyer, solicitor, lawsuit, suing or legal action, do these things and nothing else: acknowledge the complaint once in a single calm sentence, call escalate_to_human, and tell the customer a person will follow up. Do not give an entitlements rundown. Do not mention refunds, vouchers, meal credits, upgrades or any other compensation, even if the policy would allow it. Do not argue with or comment on the legal threat. Do not call issue_voucher or confirm_rebooking.
+
+2. Sensitive information. Never reveal payment card details, or any data about other customers. Refuse in one sentence, call escalate_to_human, and always write a reply to the customer, never an empty one.
+
+3. Stay grounded. State only what a tool result actually says. If a tool returns a yes or no with no reason, give no reason. If the customer's description of events is not confirmed by the booking, say what the booking does show and ask one clarifying question. Never explain a policy decision with a reason that is not in the tool output, and never name a cabin or fare class by a name the tools did not use.
+"""                                      # ✏️ Build 4, step 4.1, intelligence goal
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Build 2: the functions behind the extra tools. Each one reads a file in

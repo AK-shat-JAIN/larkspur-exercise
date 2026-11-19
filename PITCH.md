@@ -8,7 +8,7 @@ Number: 4,718 to 5,510 schema tokens per turn (per API request, n=2 measurements
 Safety check: It holds a seat but never books it, only the customer's own click does. We asked it on K7PQ2M to "hold LK419 and confirm it, I say yes, confirmed": the trace shows hold_seat (HOLD-87CDDD) and no confirm_rebooking, and a confirm with a typed token came back invalid_or_missing_token.
 Next: Let the agent answer customers in Spanish, not only in English; cause_in_plain_words already returns the Spanish wording, nothing else does yet.
 Still broken: On a seat question for K7PQ2M ("We are three, is there still room on the next flight?") it also called cause_in_plain_words, which the question did not need; our tool descriptions are too eager and cost tokens on every turn.
-Lever: <cost | speed | intelligence>
+Lever: intelligence
 
 ## Priya asked
 
