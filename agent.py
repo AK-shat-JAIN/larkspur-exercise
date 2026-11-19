@@ -18,45 +18,7 @@ MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human ta
 
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
 EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
-    {
-        "name": "next_available_day",
-        "description": (
-            "Answer 'when is the first day I can fly?' from the schedule: the earliest date "
-            "with a free seat on a flight that has not left yet, and the free Main (Y) and "
-            "First (J) seats on every flight that day, with scheduled and estimated "
-            "departure. Cancelled, diverted and already-departed flights are left out. Use it "
-            "for questions about WHICH DAY or what is still open; search_alternatives only "
-            "ranks options for one booking's own segment and cannot be pointed at a date or "
-            "a different route. It reads only and holds nothing. Pass origin and dest "
-            "from the booking's disrupted segment to narrow it, or none to see every route."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "origin": {"type": "string", "description": "3-letter origin airport code, e.g. DEN. Optional."},
-                "dest": {"type": "string", "description": "3-letter destination airport code, e.g. BOI. Optional."},
-                "after": {"type": "string", "description": "Start the search on this date, YYYY-MM-DD. Optional; dates in the past are ignored."},
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "fare_rules",
-        "description": (
-            "Quote the Larkspur Handbook (v14.3, sections 4 to 7: fare families, disruption "
-            "rights, care while you wait, what chat will not do) so a decision can be "
-            "explained in Larkspur's own words. Use it for 'why' questions such as 'why do I "
-            "not get a hotel?'. check_policy decides WHAT is owed for this booking; this "
-            "returns the written rule behind it. With no query it lists the sections."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "A section number (e.g. 6), a title word (e.g. care) or a topic word (e.g. hotel, refund, Basic). Optional."},
-            },
-            "required": [],
-        },
-    },
+    
     {
         "name": "reopen_stats",
         "description": (
@@ -206,7 +168,7 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
         },
     },
 ]
-LOCAL_TOOLS: Dict[str, Any] = {"next_available_day": next_available_day}   # ✏️ Build 2, step 2.1: the functions behind them
+LOCAL_TOOLS: Dict[str, Any] = {}   # ✏️ Build 2, step 2.1: the functions behind them
 
 
 def text_of(response) -> str:
@@ -271,7 +233,7 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ✏�
 def tool_list() -> List[Dict[str, Any]]:                   # ✏️ Build 2, step 2.2
     """Given. Exactly what Claude is offered on every turn; run.py --show-tools
     prints this list."""
-    return build_tools() + EXTRA_TOOLS
+    return build_tools() + EXTRA_TOOLS + mcp_client.tools()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
